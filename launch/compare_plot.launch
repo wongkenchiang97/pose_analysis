@@ -1,0 +1,8 @@
+<launch>
+    <arg name="field_name" default=" distance"/>
+
+    <param name="field_name" value="$(arg field_name)"/>
+    
+    <node pkg="pose_analysis" type="compare_plot.py" name="compare_plot" output="screen">
+    </node>
+</launch>

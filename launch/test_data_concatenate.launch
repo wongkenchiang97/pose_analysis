@@ -1,0 +1,10 @@
+<launch>
+    <arg name="dirs" default=""/>
+    <arg name="rack_distance" default="0.0"/>
+
+    <node pkg="pose_analysis" type="test_data_concatenate_node" name="test_data_concatenate" output="screen" args="$(arg dirs)">
+        <param name="dirs" value="$(arg dirs)"/>
+        <param name="rack_distance" value="$(arg rack_distance)"/>
+    </node>
+
+</launch>

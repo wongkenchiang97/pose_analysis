@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="pose_analysis" type="analysis_tools_node" name="analysis_tools" output="screen"/>
+
+    <node pkg="rviz" type="rviz" name="analysis_tool_rviz" args="-f camera -d $(find pose_analysis)/config/rviz/analysis_tools.rviz"/>
+</launch>

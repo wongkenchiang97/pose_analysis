@@ -1,0 +1,8 @@
+<launch>
+    <arg name="dirs" default=""/>
+
+    <node pkg="pose_analysis" type="distance_data_concatenate_node" name="distance_data_concatenate" output="screen" args="$(arg dirs)">
+        <param name="dirs" value="$(arg dirs)"/>
+    </node>
+
+</launch>
