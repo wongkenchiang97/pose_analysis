@@ -18,7 +18,8 @@
 
 #include <pose_analysis/pose_data.h>
 
-class PoseAnalysis {
+class PoseAnalysis
+{
 private:
     ros::NodeHandlePtr nh_;
     ros::NodeHandlePtr pnh_;
@@ -27,6 +28,7 @@ private:
     ros::Publisher show_error_flag_pub_;
     std::string pose_topic_name_;
     double rack_distance_;
+    bool apply_zero_mean_;
     std::deque<geometry_msgs::PoseStamped> pose_buffer_;
     std::vector<analysis::PoseData> pose_data_;
     std::vector<Eigen::Vector3d> pose_error_;
@@ -38,46 +40,50 @@ private:
     Eigen::Matrix4d experiment_gt_;
     Eigen::Matrix4d measurement_to_gt_tf_;
 
-    void poseCallback(const geometry_msgs::PoseStampedConstPtr& _msgs);
+    void poseCallback(const geometry_msgs::PoseStampedConstPtr &_msgs);
     void extractProcess();
     void keyPressProcess();
     void extractBufferPose();
     void writePoseError();
-    void publishPoseError(const ros::Time& _stamp, const geometry_msgs::Point& _pt, const geometry_msgs::Quaternion& _q);
+    void publishPoseError(const ros::Time &_stamp, const geometry_msgs::Point &_pt, const geometry_msgs::Quaternion &_q);
     void getTimeConsumed();
     void transformGroundtruthToNCUFrame();
-    double getVectorStandardDeviation(const Eigen::VectorXd& _vec);
+    void applyZeroMeanError();
+    double getVectorStandardDeviation(const Eigen::VectorXd &_vec);
     Eigen::Matrix<double, -1, 3, Eigen::RowMajor> getPoseError();
-    Eigen::Vector3d getPoseError(const geometry_msgs::PoseStamped& _est_pose);
+    Eigen::Vector3d getPoseError(const geometry_msgs::PoseStamped &_est_pose);
     template <class T>
-    Eigen::Matrix<std::string, -1, -1, 1> convertMatrixToStringMatrix(const Eigen::Matrix<T, -1, -1>& _input_mat, int row_size, int col_size);
+    Eigen::Matrix<std::string, -1, -1, 1> convertMatrixToStringMatrix(const Eigen::Matrix<T, -1, -1> &_input_mat, int row_size, int col_size);
 
 public:
-    PoseAnalysis(ros::NodeHandlePtr& _nh, ros::NodeHandlePtr& _pnh);
+    PoseAnalysis(ros::NodeHandlePtr &_nh, ros::NodeHandlePtr &_pnh);
     ~PoseAnalysis();
-    double quatToYaw(const geometry_msgs::Quaternion& _orientation);
-    double getRelativeYawAngle(const geometry_msgs::Quaternion& _orientation);
+    double quatToYaw(const geometry_msgs::Quaternion &_orientation);
+    double getRelativeYawAngle(const geometry_msgs::Quaternion &_orientation);
 };
 
-PoseAnalysis::PoseAnalysis(ros::NodeHandlePtr& _nh, ros::NodeHandlePtr& _pnh)
+PoseAnalysis::PoseAnalysis(ros::NodeHandlePtr &_nh, ros::NodeHandlePtr &_pnh)
 {
     nh_ = _nh;
     pnh_ = _pnh;
-    pnh_->param<std::string>("/pose_topic_name", pose_topic_name_, "/pose");
-    pnh_->param<double>("rack_distance", rack_distance_, 0.0);
+    pnh_->param<std::string>(pnh_->getNamespace() + "/pose_topic_name", pose_topic_name_, "/pose");
+    pnh_->param<double>(pnh_->getNamespace() + "/rack_distance", rack_distance_, 0.0);
     std::cout << "rack_distance: " << std::to_string(rack_distance_) << std::endl;
+    pnh_->param<bool>(pnh_->getNamespace() + "/zero_mean_error", apply_zero_mean_, false);
     // std::cout << "pose_topic_name_: " << pose_topic_name_ << std::endl;
     pose_sub_ = nh_->subscribe(pose_topic_name_, 1000, &PoseAnalysis::poseCallback, this);
     error_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>("/pose_error", 10);
     show_error_flag_pub_ = nh_->advertise<std_msgs::Bool>("/show_error_flag", 3, true);
     std::vector<double> tmp_T(16);
-    if (pnh_->getParam("/experiment_gt/T", tmp_T)) {
+    if (pnh_->getParam("/experiment_gt/T", tmp_T))
+    {
         experiment_gt_ = Eigen::Map<Eigen::Matrix<double, 4, 4, Eigen::RowMajor>>(tmp_T.data(), 4, 4);
         // std::cout<<"experiment_gt:\n"<<experiment_gt_<<std::endl;
     }
     // transformGroundtruthToNCUFrame();
     std::cout << "gt:\n"
               << experiment_gt_ << std::endl;
+
     pose_extract_thread_ = std::thread(&PoseAnalysis::extractProcess, this);
     keyboard_input_thread_ = std::thread(&PoseAnalysis::keyPressProcess, this);
 }
@@ -96,7 +102,7 @@ void PoseAnalysis::transformGroundtruthToNCUFrame()
     experiment_gt_ = NCU_tf * experiment_gt_;
 }
 
-double PoseAnalysis::quatToYaw(const geometry_msgs::Quaternion& _orientation)
+double PoseAnalysis::quatToYaw(const geometry_msgs::Quaternion &_orientation)
 {
     Eigen::Quaterniond tmp_q;
     tf::quaternionMsgToEigen(_orientation, tmp_q);
@@ -107,7 +113,7 @@ double PoseAnalysis::quatToYaw(const geometry_msgs::Quaternion& _orientation)
     return yaw;
 }
 
-double PoseAnalysis::getRelativeYawAngle(const geometry_msgs::Quaternion& _orientation)
+double PoseAnalysis::getRelativeYawAngle(const geometry_msgs::Quaternion &_orientation)
 {
     Eigen::Quaterniond current_q;
     tf::quaternionMsgToEigen(_orientation, current_q);
@@ -115,7 +121,8 @@ double PoseAnalysis::getRelativeYawAngle(const geometry_msgs::Quaternion& _orien
     Eigen::Vector3d planar_x_vec;
     planar_x_vec << rel_rot.topLeftCorner(2, 1), 0.0;
     double yaw = (180.0 / M_PI) * std::acos(planar_x_vec(0));
-    if (planar_x_vec(1) < 0) {
+    if (planar_x_vec(1) < 0)
+    {
         yaw *= -1.0;
     }
     return yaw;
@@ -124,15 +131,15 @@ double PoseAnalysis::getRelativeYawAngle(const geometry_msgs::Quaternion& _orien
 void PoseAnalysis::extractBufferPose()
 {
     std::lock_guard<std::mutex> guard(pose_data_mt_);
-    while (!pose_buffer_.empty()) {
+    while (!pose_buffer_.empty())
+    {
         // ROS_INFO("Buffer size: %ld", pose_buffer_.size());
         double yaw = getRelativeYawAngle(pose_buffer_.front().pose.orientation);
         // ROS_INFO("[x,y,yaw] = [%f,%f,%f]", pose_buffer_.front().pose.position.x, pose_buffer_.front().pose.position.y, yaw);
         pose_error_.push_back(getPoseError(pose_buffer_.front()));
         publishPoseError(pose_buffer_.front().header.stamp, pose_buffer_.front().pose.position, pose_buffer_.front().pose.orientation);
         pose_data_.emplace_back(pose_buffer_.front().pose.position.x, pose_buffer_.front().pose.position.y, yaw);
-        time_data_.emplace_back(pose_buffer_.front().header.stamp.sec
-            + pose_buffer_.front().header.stamp.nsec * 1e-9);
+        time_data_.emplace_back(pose_buffer_.front().header.stamp.sec + pose_buffer_.front().header.stamp.nsec * 1e-9);
         pose_buffer_.pop_front();
     }
 }
@@ -141,7 +148,7 @@ Eigen::Matrix<double, -1, 3, Eigen::RowMajor> PoseAnalysis::getPoseError()
 {
     Eigen::MatrixXd pose_error;
     Eigen::Map<Eigen::Matrix<double, -1, 3, Eigen::RowMajor>> pose_map(&(pose_data_.front().x), pose_data_.size(), 3);
-    Eigen::Vector2d planar_gt = { experiment_gt_(0, 3), experiment_gt_(2, 3) };
+    Eigen::Vector2d planar_gt = {experiment_gt_(0, 3), experiment_gt_(2, 3)};
     pose_error = pose_map.leftCols(2) - planar_gt.transpose().replicate(pose_data_.size(), 1);
     pose_error.conservativeResize(Eigen::NoChange, pose_error.cols() + 1);
     pose_error.col(pose_error.cols() - 1) = pose_map.rightCols(1);
@@ -149,7 +156,7 @@ Eigen::Matrix<double, -1, 3, Eigen::RowMajor> PoseAnalysis::getPoseError()
     return pose_error;
 }
 
-Eigen::Vector3d PoseAnalysis::getPoseError(const geometry_msgs::PoseStamped& _est_pose)
+Eigen::Vector3d PoseAnalysis::getPoseError(const geometry_msgs::PoseStamped &_est_pose)
 {
     Eigen::Vector3d output;
     Eigen::Matrix4d rel_pose = Eigen::Matrix4d::Identity();
@@ -163,7 +170,8 @@ Eigen::Vector3d PoseAnalysis::getPoseError(const geometry_msgs::PoseStamped& _es
     planar_rel_pose.topRightCorner(2, 1) = rel_pose.topRightCorner(2, 1);
 
     double yaw = std::acos(planar_rel_pose.block<3, 1>(0, 0).dot(Eigen::Vector3d::UnitX()));
-    if (planar_rel_pose(1, 0) < 0) {
+    if (planar_rel_pose(1, 0) < 0)
+    {
         yaw *= -1.0;
     }
 
@@ -188,11 +196,12 @@ void PoseAnalysis::writePoseError()
     std::string time_series_csv_dir = ros::package::getPath(node_name);
     time_series_csv_dir.append("/data/analysis/time_series_pose_error_data.csv");
     std::ofstream file_time(time_series_csv_dir);
-    if (!file_time.is_open()) {
+    if (!file_time.is_open())
+    {
         throw std::runtime_error("writePoseError(): failed to open pose csv file.");
     }
     std::cout << "writing pose data to : " << time_series_csv_dir << std::endl;
-    std::vector<std::string> field_name = { "x_error(m)", "y_error(m)", "yaw_error(°)" };
+    std::vector<std::string> field_name = {"x_error(m)", "y_error(m)", "yaw_error(°)"};
     Eigen::Matrix<std::string, -1, -1, 1> header_time;
     header_time.conservativeResize(1, 4);
     header_time << "duration", field_name[0], field_name[1], field_name[2];
@@ -213,7 +222,8 @@ void PoseAnalysis::writePoseError()
     stats_csv_dir.append("/data/analysis/stats_data.csv");
     std::ofstream file_stats(stats_csv_dir);
     auto pose_error_map = Eigen::Map<Eigen::Matrix3Xd>(pose_error_.data()->data(), 3, pose_error_.size());
-    if (pose_error_map.cols() < 2) {
+    if (pose_error_map.cols() < 2)
+    {
         throw std::runtime_error("empty data to estimate data standard deviation.");
     }
     double stdev_x = 100 * getVectorStandardDeviation(pose_error_map.row(0));
@@ -226,7 +236,7 @@ void PoseAnalysis::writePoseError()
     Eigen::Matrix<std::string, -1, -1, 1> str_stdev_mat;
     stdev_mat.resize(1, 3);
     stdev_mat.row(0) << stdev_x, stdev_y, stdev_yaw;
-    field_name = { "σ_x(cm)", "σ_y(cm)", "σ_yaw(°)" };
+    field_name = {"σ_x(cm)", "σ_y(cm)", "σ_yaw(°)"};
     header_stats.conservativeResize(1, 4);
     str_stdev_mat = convertMatrixToStringMatrix(stdev_mat, 1, 3);
     distance_vec.resize(1, 1);
@@ -236,7 +246,8 @@ void PoseAnalysis::writePoseError()
     combine_matrix.topLeftCorner(header_stats.rows(), header_stats.cols()) = header_stats;
     combine_matrix.bottomLeftCorner(distance_vec.rows(), distance_vec.cols()) = distance_vec;
     combine_matrix.bottomRightCorner(str_stdev_mat.rows(), str_stdev_mat.cols()) = str_stdev_mat;
-    if (!file_stats.is_open()) {
+    if (!file_stats.is_open())
+    {
         throw std::runtime_error("writePoseError(): failed to open stats csv file.");
     }
     std::cout << "writing stats data to : " << stats_csv_dir << std::endl;
@@ -250,13 +261,13 @@ void PoseAnalysis::writePoseError()
     show_error_flag_pub_.publish(show_error_flag);
 }
 
-double PoseAnalysis::getVectorStandardDeviation(const Eigen::VectorXd& _vec)
+double PoseAnalysis::getVectorStandardDeviation(const Eigen::VectorXd &_vec)
 {
     double stddev = std::sqrt((_vec.array() - _vec.mean()).square().sum() / (_vec.size() - 1));
     return stddev;
 }
 
-void PoseAnalysis::publishPoseError(const ros::Time& _stamp, const geometry_msgs::Point& _pt, const geometry_msgs::Quaternion& _q)
+void PoseAnalysis::publishPoseError(const ros::Time &_stamp, const geometry_msgs::Point &_pt, const geometry_msgs::Quaternion &_q)
 {
     geometry_msgs::Vector3Stamped output_error;
     output_error.header.stamp = _stamp;
@@ -271,10 +282,11 @@ void PoseAnalysis::getTimeConsumed()
 }
 
 template <class T>
-Eigen::Matrix<std::string, -1, -1, 1> PoseAnalysis::convertMatrixToStringMatrix(const Eigen::Matrix<T, -1, -1>& _input_mat, int _row_size, int _col_size)
+Eigen::Matrix<std::string, -1, -1, 1> PoseAnalysis::convertMatrixToStringMatrix(const Eigen::Matrix<T, -1, -1> &_input_mat, int _row_size, int _col_size)
 {
     Eigen::Matrix<std::string, -1, -1, 1> str_mat;
-    if (_row_size * _col_size != _input_mat.size()) {
+    if (_row_size * _col_size != _input_mat.size())
+    {
         ROS_ERROR("incompatible matrix dimension.");
         return str_mat;
     }
@@ -284,10 +296,13 @@ Eigen::Matrix<std::string, -1, -1, 1> PoseAnalysis::convertMatrixToStringMatrix(
     std::string entity_str;
     int index = 0;
     mat_ss << _input_mat;
-    while (std::getline(mat_ss, row_str, '\n')) {
+    while (std::getline(mat_ss, row_str, '\n'))
+    {
         std::stringstream row_stream(row_str);
-        while (std::getline(row_stream, entity_str, ' ')) {
-            if (entity_str.empty()) {
+        while (std::getline(row_stream, entity_str, ' '))
+        {
+            if (entity_str.empty())
+            {
                 continue;
             }
             str_mat(index) = entity_str;
@@ -297,9 +312,20 @@ Eigen::Matrix<std::string, -1, -1, 1> PoseAnalysis::convertMatrixToStringMatrix(
     return str_mat;
 }
 
+void PoseAnalysis::applyZeroMeanError()
+{
+    std::lock_guard<std::mutex> guard(pose_data_mt_);
+
+    if (pose_data_.empty())
+        return;
+
+    Eigen::Map<Eigen::MatrixXd> pose_error_map(&pose_error_.front()(0), 3, pose_data_.size());
+    pose_error_map.colwise() -= pose_error_map.rowwise().mean();
+}
+
 /*---loops----*/
 
-void PoseAnalysis::poseCallback(const geometry_msgs::PoseStampedConstPtr& _msgs)
+void PoseAnalysis::poseCallback(const geometry_msgs::PoseStampedConstPtr &_msgs)
 {
     pose_buffer_.emplace_back(*_msgs);
 }
@@ -307,7 +333,8 @@ void PoseAnalysis::poseCallback(const geometry_msgs::PoseStampedConstPtr& _msgs)
 void PoseAnalysis::extractProcess()
 {
     auto nxt = std::chrono::steady_clock::now();
-    while (ros::ok()) {
+    while (ros::ok())
+    {
         nxt += std::chrono::milliseconds(1000);
         extractBufferPose();
         std::this_thread::sleep_until(nxt);
@@ -321,14 +348,20 @@ void PoseAnalysis::keyPressProcess()
     printw("press enter key to save pose data.\n");
     noecho();
     cbreak();
-    while (ros::ok()) {
+    ros::Rate rate(30);
+    while (ros::ok())
+    {
         key_press = getch();
-        if (key_press == 10) {
+        if (key_press == 10)
+        {
             clrtoeol();
             refresh();
             endwin();
+            if (apply_zero_mean_)
+                applyZeroMeanError();
             writePoseError();
         }
+        rate.sleep();
     }
     clrtoeol();
     refresh();

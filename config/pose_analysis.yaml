@@ -1,0 +1,2 @@
+pose_topic_name: /rack_localization/action_server/locator/rack_pose
+zero_mean_error: true #considered as precision analysis

@@ -1,7 +1,6 @@
 <launch>
     <param name="/use_sim_time" value="true"/>
 
-    <arg name="pose_topic_name" default="/pose"/>
     <arg name="gt_dir" default=""/>
     <arg name="bag_dir" default=""/>
     <arg name="play_bag_rate" default="100"/>
@@ -10,11 +9,10 @@
     <rosparam file="$(arg gt_dir)"/>
 
     <node pkg="pose_analysis" type="pose_analysis_node" name="pose_analysis" output="screen">
+        <rosparam file="$(find pose_analysis)/config/pose_analysis.yaml"/>
         <param name="rack_distance" value="$(arg rack_distance)"/>
     </node>
     <node pkg="pose_analysis" type="pose_error_analysis.py" name="pose_error_visualizer"/>
-
-    <param name="pose_topic_name" value="$(arg pose_topic_name)"/>
 
     <node pkg="rosbag" type="play" name="bag_player" args="--clock -r $(arg play_bag_rate) $(arg bag_dir)">
         <remap from="/locator/rack_pose" to="/pose"/>
