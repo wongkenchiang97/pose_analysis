@@ -8,7 +8,7 @@
 
     <rosparam file="$(arg gt_dir)"/>
 
-    <node pkg="pose_analysis" type="pose_analysis_node" name="pose_analysis" output="screen">
+    <node pkg="pose_analysis" type="pose_analysis_node" name="pose_analysis" output="screen" >
         <rosparam file="$(find pose_analysis)/config/pose_analysis.yaml"/>
         <param name="rack_distance" value="$(arg rack_distance)"/>
     </node>

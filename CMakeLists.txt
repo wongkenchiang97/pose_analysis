@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   eigen_conversions
   # tf_conversions
   pcl_ros
+  tof_base
 )
 find_package(Eigen3 REQUIRED)
 find_package(Curses REQUIRED)

@@ -1,2 +1,5 @@
 pose_topic_name: /rack_localization/action_server/locator/rack_pose
 zero_mean_error: true #considered as precision analysis
+pose_transform: #represent pose estimation on target frmae with a given transformation
+  apply_transform: true  
+  transformation: [0.0,0.0,0.0,0.0,0.0,0.0,0.0] #[x y z roll(deg) pitch(deg) yaw(deg)] --> camera_T_target
