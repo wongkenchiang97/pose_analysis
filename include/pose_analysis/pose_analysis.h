@@ -92,7 +92,7 @@ void PoseAnalysis::setParams()
     }
     if (apply_transform_) {
         std::vector<double> xyz_rpy(6);
-        pnh_->param(pnh_->getNamespace() + "/pose_transform/transformation", xyz_rpy);
+        pnh_->param<std::vector<double>>(pnh_->getNamespace() + "/pose_transform/transformation", xyz_rpy, { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
         Eigen::Map<Eigen::MatrixXd> xyz_rpy_map(xyz_rpy.data(), (int)xyz_rpy.size(), 1);
         camera_T_target_ = algebraic::createTransform<double>(xyz_rpy_map, true).matrix();
     }
